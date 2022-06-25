@@ -2,8 +2,10 @@ import os
 os.system('cls')
 from tkinter import * #módulo para interface gráfica
 from tkinter import ttk # o ttk amplia as funções do tkinter
-from tkinter import messagebox
-import sqlite3
+from tkinter import messagebox #módulo para mensagens de confirmação e erro
+from PIL import Image, ImageTk #módulo para adcionar imagem
+from tkinter import filedialog #módulo para buscar arquivo no PC
+import sqlite3 #módulo para banco de dados
 
 class Funcs_cadastro_cliente():
     def limpa_tela(self):
@@ -22,14 +24,23 @@ class Funcs_cadastro_cliente():
         self.cb_plano.set('')
         self.lb_preço.config(text='')
         self.lb_cpf_erro.config(text='')
+        self.lb_imagem.config(image='')
+        self.fln = ('')
+
+    def limpa_imagem(self): 
+        self.lb_imagem.config(image='')  
+        self.fln = ('')
+
     def conecta_bd(self):
-        self.conn = sqlite3.connect("clientes.db")
+        self.conn = sqlite3.connect("cliente.db")
         self.cursor = self.conn.cursor(); print('Conectando ao Banco de Dados...')
+    
     def desconecta_bd(self):
+
         self.conn.close(); print("Desconectando do Banco de Dados.")
+
     def montaTabelas(self): # cria tabelas dentro do banco de dados
         self.conecta_bd()
-        # Criar Tabela
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS clientes(
                 matricula INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,12 +56,14 @@ class Funcs_cadastro_cliente():
                 bairro VARCHAR(25),
                 cidade VARCHAR(25),
                 plano VARCHAR(25),
-                valor VARCHAR(25)     
+                valor VARCHAR(25),
+                imagem_perfil VARCHAR(100)    
               
-            );        
-        """)
+            ); """)
+
         self.conn.commit(); print("Banco de Dados criado!")
         self.desconecta_bd()
+
     def variaveis(self):
         self.matricula = self.ed_matricula.get()
         self.nome = self.ed_nome.get()
@@ -66,30 +79,34 @@ class Funcs_cadastro_cliente():
         self.cidade = self.ed_cidade.get()
         self.plano =self.cb_plano.get()
         self.valor = self.lb_preço["text"]
+        self.imagem = self.fln
+
     def cadastrar_cliente(self): # adiciona os valores ao banco de dados digitados na tela
         self.variaveis()
         self.conecta_bd() # conecta ao banco de dados
-        self.cursor.execute(""" INSERT INTO clientes(nome_cliente, email, nascimento, sexo, cpf, telefone, cep, logradouro, complemento, bairro, cidade, plano, valor)
-         VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,? ,?)""",
-         ( self.nome, self.email, self.nascimento, self.sexo, self.cpf, self.telefone, self.cep, self.logradouro, self.complemento,self.bairro, self.cidade, self.plano, self.valor))
+        self.cursor.execute(""" INSERT INTO clientes(nome_cliente, email, nascimento, sexo, cpf, telefone, cep, logradouro, complemento, bairro, cidade, plano, valor, imagem_perfil)
+         VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,?)""",
+         ( self.nome, self.email, self.nascimento, self.sexo, self.cpf, self.telefone, self.cep, self.logradouro, self.complemento,self.bairro, self.cidade, self.plano, self.valor, self.imagem))
         self.conn.commit() # validar os dados
         self.desconecta_bd()
         self.select_lista()
         self.limpa_tela()
+
     def select_lista(self):
         self.listaCli.delete(*self.listaCli.get_children())
         self.conecta_bd()
-        lista = self.cursor.execute(""" SELECT matricula, nome_cliente, email, nascimento, sexo, cpf, telefone, cep, logradouro, complemento, bairro, cidade, plano, valor FROM clientes 
+        lista = self.cursor.execute(""" SELECT matricula, nome_cliente, email, nascimento, sexo, cpf, telefone, cep, logradouro, complemento, bairro, cidade, plano, valor, imagem_perfil FROM clientes 
         ORDER BY matricula; """)
         for i in lista:
             self.listaCli.insert("", END, values=i)
         self.desconecta_bd()
+
     def clique_duplo(self, event):    
         self.limpa_tela()
         self.listaCli.selection()
 
         for n in self.listaCli.selection():
-            col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13,col14 = self.listaCli.item(n, 'values')
+            col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14,col15 = self.listaCli.item(n, 'values')
             self.ed_matricula.insert(END, col1)
             self.ed_nome.insert(END, col2)
             self.ed_email.insert(END, col3)
@@ -103,6 +120,17 @@ class Funcs_cadastro_cliente():
             self.ed_bairro.insert(END, col11)
             self.ed_cidade.insert(END, col12)
             self.cb_plano.insert(END, col13)
+            self.lb_preço.config(text= col14)
+            #Exibição imagem na interface(repeti a função showimage, mas coloquei para fln recelber a coluna 15 da treeview):
+            self.fln = col15
+            self.img = Image.open(self.fln)
+            self.resized = self.img.resize((200,266), Image.ANTIALIAS)
+            self.nova_img= ImageTk.PhotoImage(self.resized)
+            self.lb_imagem.configure(image=self.nova_img)
+            self.lb_imagem.image = self.nova_img  
+            self.lb_imagem.config(END, image= self.nova_img)
+
+            
     def deletar_cliente(self):
         self.variaveis() 
         self.conecta_bd()
@@ -111,28 +139,31 @@ class Funcs_cadastro_cliente():
         self.desconecta_bd()
         self.limpa_tela()
         self.select_lista()
+
     def update_cliente(self):
         self.variaveis()
         self.conecta_bd()
-        self.cursor.execute(""" UPDATE clientes SET nome_cliente = ?, email = ?, nascimento = ?, sexo = ?, cpf = ?, telefone = ?, cep = ?, logradouro = ?, complemento = ?, bairro = ?, cidade = ?, plano = ?, valor = ? 
-                                WHERE matricula = ? """, (self.nome, self.email, self.nascimento, self.sexo, self.cpf, self.telefone, self.cep, self.logradouro, self.complemento, self.bairro, self.cidade, self.plano, self.valor, self.matricula))
+        self.cursor.execute(""" UPDATE clientes SET nome_cliente = ?, email = ?, nascimento = ?, sexo = ?, cpf = ?, telefone = ?, cep = ?, logradouro = ?, complemento = ?, bairro = ?, cidade = ?, plano = ?, valor = ?, imagem_perfil = ?
+                                WHERE matricula = ? """, (self.nome, self.email, self.nascimento, self.sexo, self.cpf, self.telefone, self.cep, self.logradouro, self.complemento, self.bairro, self.cidade, self.plano, self.valor, self.imagem, self.matricula))
         self.conn.commit()                        
         self.desconecta_bd()
         self.select_lista()
         self.limpa_tela()
+
     def buscar_cliente(self):
         self.conecta_bd()
         self.listaCli.delete(*self.listaCli.get_children())
         self.ed_nome.insert(END, '%')
         nome= self.ed_nome.get()
         self.cursor.execute(
-            """ SELECT matricula, nome_cliente, email, nascimento, sexo, cpf, telefone, cep, logradouro, complemento, bairro, cidade, plano, valor FROM clientes 
+            """ SELECT matricula, nome_cliente, email, nascimento, sexo, cpf, telefone, cep, logradouro, complemento, bairro, cidade, plano, valor, imagem_perfil FROM clientes 
             WHERE nome_cliente LIKE "%s" ORDER BY nome_cliente ASC """ % nome)
         buscanomeCli = self.cursor.fetchall()
         for i in buscanomeCli:
             self.listaCli.insert("",END, values=i)
         self.limpa_tela()    
         self.desconecta_bd()
+
     def refresh_lista(self): #Atualiza lista após buscar alguem cadastrado:
         self.variaveis()
         self.conecta_bd()                       
@@ -140,6 +171,14 @@ class Funcs_cadastro_cliente():
         self.select_lista()
         self.limpa_tela()
 
+    def showimage(self):
+        self.fln = filedialog.askopenfilename(initialdir= os.getcwd(), title= "Select Image File", filetypes=(("JPG File", "*.jpg"),("PNG File", "*.png"),("All files", "*.*")))
+        self.img = Image.open(self.fln)
+        self.resized = self.img.resize((200,266), Image.ANTIALIAS)
+        self.nova_img= ImageTk.PhotoImage(self.resized)
+        self.lb_imagem.configure(image=self.nova_img)
+        self.lb_imagem.image = self.nova_img
+        
 class App(Funcs_cadastro_cliente):
     def __init__(self):
         self.root = Tk()
@@ -153,12 +192,12 @@ class App(Funcs_cadastro_cliente):
         self.root.mainloop()
     
     def tela(self):
-        self.root.title("Cadastro de Alunos")
+        self.root.title("Cadastro Academia LocBoy")
         self.root.configure(background= '#155569')
         self.root.geometry('700x800')  
         self.root.resizable(True, True)  
         self.root.maxsize(width= 840, height=960)
-        self.root.minsize(width= 700, height=700)
+        self.root.minsize(width= 700, height=800)
       
     def frames_de_tela (self):  
         #Frame Cadastro Clientes:
@@ -194,14 +233,21 @@ class App(Funcs_cadastro_cliente):
         self.bt_refresh = Button(self.aba1, text= "Atualizar", font=('verdana', '9'), command=self.refresh_lista)
         self.bt_refresh.place(relx= 0.225, rely=0.005, relwidth=0.1, relheight= 0.035)
 
-        self.bt_validar_cpf = Button(self.aba1, text= "Cadastrar", font=('verdana', '9'), command=self.validar_cadastro)
-        self.bt_validar_cpf.place(relx= 0.625, rely=0.005, relwidth=0.15, relheight= 0.035) 
+        self.bt_novo = Button(self.aba1, text= "Novo", font=('verdana', '9'), command=self.validar_cadastro)
+        self.bt_novo.place(relx= 0.625, rely=0.005, relwidth=0.15, relheight= 0.035) 
 
         self.bt_alterar = Button(self.aba1, text= "Alterar", font=('verdana', '9'), command=self.validar_update_cadastro)
         self.bt_alterar.place(relx= 0.775, rely=0.005, relwidth=0.1, relheight= 0.035)
 
         self.bt_apagar = Button(self.aba1, text= "Excluir", font=('verdana', '9'), command=self.validar_exclusao)
         self.bt_apagar.place(relx= 0.875, rely=0.005, relwidth=0.1, relheight= 0.035)
+
+        self.bt_imagem = Button(self.aba1, text= "Procurar Foto", font=('verdana', '9'), command=self.showimage)
+        self.bt_imagem.place(relx= 0.655, rely=0.42, relwidth=0.18, relheight= 0.035)
+
+        self.bt_limpar_imagem = Button(self.aba1, text= "Limpar Foto", font=('verdana', '9'), command=self.limpa_imagem)
+        self.bt_limpar_imagem.place(relx= 0.655, rely=0.46, relwidth=0.18, relheight= 0.035)
+
 
         #Widgets da aba1:
         #1-Matrícula;
@@ -305,7 +351,11 @@ class App(Funcs_cadastro_cliente):
         self.lb_preço = Label(self.aba1, text= '', bg='lightgrey', fg= 'blue' , font=(50))
         self.lb_preço.place(relx=0.165, rely=0.635)
 
-        #16 Lista de matriculados :
+        #16-Imagem;
+        self.lb_imagem = Label(self.aba1, text= 'Foto JPG ou PNG', bg='#b0b0b0')
+        self.lb_imagem.place(relx=0.625, rely=0.095, relwidth= 0.24, relheight= 0.3)
+        
+        #17 Lista de matriculados :
         self.listaCli = ttk.Treeview(self.aba1, height= 3, column=('col1', 'col2','col3','col4','col5','col6','col7','col8','col9','col10','col11','col12','col13','col14','col15'))
         self.listaCli.heading('#0', text='')
         self.listaCli.heading('#1', text='Matrícula')
@@ -322,9 +372,11 @@ class App(Funcs_cadastro_cliente):
         self.listaCli.heading('#12', text='Cidade')
         self.listaCli.heading('#13', text='Plano')
         self.listaCli.heading('#14', text='Mensalidade')
-   
+        self.listaCli.heading('#15', text='Foto')
+        
+        
 
-        self.listaCli.column('#0', width=1, minwidth= 20)
+        self.listaCli.column('#0', width=20, minwidth= 20)
         self.listaCli.column('#1', width=60, minwidth= 80)
         self.listaCli.column('#2', width=100, minwidth= 220)
         self.listaCli.column('#3', width=60, minwidth= 150)
@@ -339,16 +391,18 @@ class App(Funcs_cadastro_cliente):
         self.listaCli.column('#12', width=60, minwidth= 100)
         self.listaCli.column('#13', width=60, minwidth= 100)
         self.listaCli.column('#14', width=60, minwidth= 100)
+        self.listaCli.column('#15', width=60, minwidth= 250)
+      
        
 
         self.listaCli.place(relx=0.005, rely=0.7, relwidth= 1, relheight=0.3)
         
-        #17 Scrollbar Vertical:
+        #18 Scrollbar Vertical:
         self.scrollistaV = ttk.Scrollbar(self.aba1, orient= 'vertical', command= self.listaCli.yview)
         self.listaCli['yscrollcommand'] = self.scrollistaV.set
         self.scrollistaV.place(relx=0.975, rely=0.7, relwidth= 0.025, relheight=0.275)
 
-        #17 Scrollbar Horizontal:
+        #19 Scrollbar Horizontal:
         self.scrollistaH = ttk.Scrollbar(self.aba1, orient= 'horizontal', command= self.listaCli.xview)
         self.listaCli['xscrollcommand'] = self.scrollistaH.set
         self.scrollistaH.place(relx=0.005, rely=0.975, relwidth= 1, relheight=0.025)
@@ -377,31 +431,34 @@ class App(Funcs_cadastro_cliente):
         digitos = []
 
         #extrair os dígitos do CPF
-        for digito in str(cpf):
-            digitos.append(int(digito))
+        if cpf.isdigit() == True:
+            for digito in str(cpf):
+                digitos.append(int(digito))
 
-        if len(digitos)!= 11:
-            validacpf = False
-
-        elif digitos[0] == digitos[1] == digitos[2] == digitos[3] == digitos[4] == digitos[5] == digitos[6] == digitos[7] == digitos[8] ==digitos[9] == digitos[10]:
-            validacpf = False
-        else:
-            soma1 = digitos[0]*10 + digitos[1]*9 + digitos[2]*8 + digitos[3]*7 + digitos[4]*6 + digitos[5]*5 + digitos[6]*4 + digitos[7]*3 + digitos[8]*2
-            resto1 = (soma1 * 10) % 11
-
-            if resto1 == 10:
-                resto1 = 0
-
-            soma2 = digitos[0]*11 + digitos[1]*10 + digitos[2]*9 + digitos[3]*8 + digitos[4]*7 + digitos[5]*6 + digitos[6]*5 + digitos[7]*4 + digitos[8]*3 + digitos[9]*2
-            resto2 = (soma2 * 10) % 11
-
-            if resto2 == 10:
-                resto2 = 0
-
-            if resto1 == digitos[9] and resto2 == digitos[10]:
-                validacpf = True
-            else:
+            if len(digitos)!= 11:
                 validacpf = False
+
+            elif digitos[0] == digitos[1] == digitos[2] == digitos[3] == digitos[4] == digitos[5] == digitos[6] == digitos[7] == digitos[8] ==digitos[9] == digitos[10]:
+                validacpf = False
+            else:
+                soma1 = digitos[0]*10 + digitos[1]*9 + digitos[2]*8 + digitos[3]*7 + digitos[4]*6 + digitos[5]*5 + digitos[6]*4 + digitos[7]*3 + digitos[8]*2
+                resto1 = (soma1 * 10) % 11
+
+                if resto1 == 10:
+                    resto1 = 0
+
+                soma2 = digitos[0]*11 + digitos[1]*10 + digitos[2]*9 + digitos[3]*8 + digitos[4]*7 + digitos[5]*6 + digitos[6]*5 + digitos[7]*4 + digitos[8]*3 + digitos[9]*2
+                resto2 = (soma2 * 10) % 11
+
+                if resto2 == 10:
+                    resto2 = 0
+
+                if resto1 == digitos[9] and resto2 == digitos[10]:
+                    validacpf = True
+                else:
+                    validacpf = False
+        else:
+            validacpf = False
 
         self.confirmar_cadastro =  messagebox.askyesno('Cadastrar cliente','Deseja confirmar cadastro?')
 
@@ -421,31 +478,34 @@ class App(Funcs_cadastro_cliente):
         digitos = []
 
         #extrair os dígitos do CPF
-        for digito in str(cpf):
-            digitos.append(int(digito))
+        if cpf.isdigit() == True:
+            for digito in str(cpf):
+                digitos.append(int(digito))
 
-        if len(digitos)!= 11:
-            validacpf = False
-
-        elif digitos[0] == digitos[1] == digitos[2] == digitos[3] == digitos[4] == digitos[5] == digitos[6] == digitos[7] == digitos[8] ==digitos[9] == digitos[10]:
-            validacpf = False
-        else:
-            soma1 = digitos[0]*10 + digitos[1]*9 + digitos[2]*8 + digitos[3]*7 + digitos[4]*6 + digitos[5]*5 + digitos[6]*4 + digitos[7]*3 + digitos[8]*2
-            resto1 = (soma1 * 10) % 11
-
-            if resto1 == 10:
-                resto1 = 0
-
-            soma2 = digitos[0]*11 + digitos[1]*10 + digitos[2]*9 + digitos[3]*8 + digitos[4]*7 + digitos[5]*6 + digitos[6]*5 + digitos[7]*4 + digitos[8]*3 + digitos[9]*2
-            resto2 = (soma2 * 10) % 11
-
-            if resto2 == 10:
-                resto2 = 0
-
-            if resto1 == digitos[9] and resto2 == digitos[10]:
-                validacpf = True
-            else:
+            if len(digitos)!= 11:
                 validacpf = False
+
+            elif digitos[0] == digitos[1] == digitos[2] == digitos[3] == digitos[4] == digitos[5] == digitos[6] == digitos[7] == digitos[8] ==digitos[9] == digitos[10]:
+                validacpf = False
+            else:
+                soma1 = digitos[0]*10 + digitos[1]*9 + digitos[2]*8 + digitos[3]*7 + digitos[4]*6 + digitos[5]*5 + digitos[6]*4 + digitos[7]*3 + digitos[8]*2
+                resto1 = (soma1 * 10) % 11
+
+                if resto1 == 10:
+                    resto1 = 0
+
+                soma2 = digitos[0]*11 + digitos[1]*10 + digitos[2]*9 + digitos[3]*8 + digitos[4]*7 + digitos[5]*6 + digitos[6]*5 + digitos[7]*4 + digitos[8]*3 + digitos[9]*2
+                resto2 = (soma2 * 10) % 11
+
+                if resto2 == 10:
+                    resto2 = 0
+
+                if resto1 == digitos[9] and resto2 == digitos[10]:
+                    validacpf = True
+                else:
+                    validacpf = False
+        else:
+            validacpf = False
 
         self.confirmar_alterar =  messagebox.askyesno('Alterar dados cliente','Deseja confirmar alteração de cadastro?')
 
